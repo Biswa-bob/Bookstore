@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from "react"
-import { type User, type AuthTokens, type AuthState, authAPI, tokenStorage } from "@/lib/auth"
+import { type User, type AuthTokens, type AuthState, authAPI, tokenStorage, loginAndLoadUser } from "@/lib/auth"
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>
@@ -51,15 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedTokens = tokenStorage.getTokens()
       if (storedTokens) {
         try {
-          // In a real app, validate the token and get user info
-          // For now, we'll simulate this
-          const mockUser: User = {
-            id: "1",
-            email: "user@example.com",
-            role: "user",
-            name: "User",
-          }
-          dispatch({ type: "SET_USER", payload: { user: mockUser, tokens: storedTokens } })
+          // Validate the token and get user info
+          const user = await authAPI.getProfile()
+          dispatch({ type: "SET_USER", payload: { user, tokens: storedTokens } })
         } catch (error) {
           tokenStorage.clearTokens()
           dispatch({ type: "CLEAR_AUTH" })
@@ -75,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     dispatch({ type: "SET_LOADING", payload: true })
     try {
-      const { user, tokens } = await authAPI.login(email, password)
+      const { user, tokens } = await loginAndLoadUser(email, password)
       tokenStorage.setTokens(tokens)
       dispatch({ type: "SET_USER", payload: { user, tokens } })
     } catch (error) {
@@ -87,8 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name: string) => {
     dispatch({ type: "SET_LOADING", payload: true })
     try {
-      const { user, tokens } = await authAPI.register(email, password, name)
+      const tokens = await authAPI.register(email, password, name)
       tokenStorage.setTokens(tokens)
+      const user = await authAPI.getProfile()
       dispatch({ type: "SET_USER", payload: { user, tokens } })
     } catch (error) {
       dispatch({ type: "SET_LOADING", payload: false })
