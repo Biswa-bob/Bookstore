@@ -1,133 +1,134 @@
-"use client"
+'use client';
 
-import { createContext, useContext, useEffect, useReducer, type ReactNode } from "react"
-import { type User, type AuthTokens, type AuthState, authAPI, tokenStorage, loginAndLoadUser } from "@/lib/auth"
+import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react';
+import { type User, type AuthTokens, type AuthState, authAPI, tokenStorage, loginAndLoadUser } from '@/lib/auth';
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name: string) => Promise<void>
-  logout: () => Promise<void>
-  refreshTokens: () => Promise<void>
+	login: (email: string, password: string) => Promise<void>;
+	register: (email: string, password: string, name: string) => Promise<void>;
+	logout: () => Promise<void>;
+	refreshTokens: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 type AuthAction =
-  | { type: "SET_LOADING"; payload: boolean }
-  | { type: "SET_USER"; payload: { user: User; tokens: AuthTokens } }
-  | { type: "SET_TOKENS"; payload: AuthTokens }
-  | { type: "CLEAR_AUTH" }
+	| { type: 'SET_LOADING'; payload: boolean }
+	| { type: 'SET_USER'; payload: { user: User; tokens: AuthTokens } }
+	| { type: 'SET_TOKENS'; payload: AuthTokens }
+	| { type: 'CLEAR_AUTH' };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
-  switch (action.type) {
-    case "SET_LOADING":
-      return { ...state, isLoading: action.payload }
-    case "SET_USER":
-      return {
-        ...state,
-        user: action.payload.user,
-        tokens: action.payload.tokens,
-        isLoading: false,
-      }
-    case "SET_TOKENS":
-      return { ...state, tokens: action.payload }
-    case "CLEAR_AUTH":
-      return { user: null, tokens: null, isLoading: false }
-    default:
-      return state
-  }
+	switch (action.type) {
+		case 'SET_LOADING':
+			return { ...state, isLoading: action.payload };
+		case 'SET_USER':
+			return {
+				...state,
+				user: action.payload.user,
+				tokens: action.payload.tokens,
+				isLoading: false,
+			};
+		case 'SET_TOKENS':
+			return { ...state, tokens: action.payload };
+		case 'CLEAR_AUTH':
+			return { user: null, tokens: null, isLoading: false };
+		default:
+			return state;
+	}
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(authReducer, {
-    user: null,
-    tokens: null,
-    isLoading: true,
-  })
+	const [state, dispatch] = useReducer(authReducer, {
+		user: null,
+		tokens: null,
+		isLoading: true,
+	});
 
-  // Initialize auth state from stored tokens
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const storedTokens = tokenStorage.getTokens()
-      if (storedTokens) {
-        try {
-          // Validate the token and get user info
-          const user = await authAPI.getProfile()
-          dispatch({ type: "SET_USER", payload: { user, tokens: storedTokens } })
-        } catch (error) {
-          tokenStorage.clearTokens()
-          dispatch({ type: "CLEAR_AUTH" })
-        }
-      } else {
-        dispatch({ type: "SET_LOADING", payload: false })
-      }
-    }
+	// Initialize auth state from stored tokens
+	useEffect(() => {
+		const initializeAuth = async () => {
+			const storedTokens = tokenStorage.getTokens();
+			if (storedTokens) {
+				try {
+					// Validate the token and get user info
+					const user = await authAPI.getProfile();
+					dispatch({ type: 'SET_USER', payload: { user, tokens: storedTokens } });
+				} catch (error) {
+					tokenStorage.clearTokens();
+					dispatch({ type: 'CLEAR_AUTH' });
+				}
+			} else {
+				dispatch({ type: 'SET_LOADING', payload: false });
+			}
+		};
 
-    initializeAuth()
-  }, [])
+		initializeAuth();
+	}, []);
 
-  const login = async (email: string, password: string) => {
-    dispatch({ type: "SET_LOADING", payload: true })
-    try {
-      const { user, tokens } = await loginAndLoadUser(email, password)
-      tokenStorage.setTokens(tokens)
-      dispatch({ type: "SET_USER", payload: { user, tokens } })
-    } catch (error) {
-      dispatch({ type: "SET_LOADING", payload: false })
-      throw error
-    }
-  }
+	const login = async (email: string, password: string) => {
+		dispatch({ type: 'SET_LOADING', payload: true });
+		try {
+			const { user, tokens } = await loginAndLoadUser(email, password);
+			tokenStorage.setTokens(tokens);
+			dispatch({ type: 'SET_USER', payload: { user, tokens } });
+		} catch (error) {
+			dispatch({ type: 'SET_LOADING', payload: false });
+			throw error;
+		}
+	};
 
-  const register = async (email: string, password: string, name: string) => {
-    dispatch({ type: "SET_LOADING", payload: true })
-    try {
-      const tokens = await authAPI.register(email, password, name)
-      tokenStorage.setTokens(tokens)
-      const user = await authAPI.getProfile()
-      dispatch({ type: "SET_USER", payload: { user, tokens } })
-    } catch (error) {
-      dispatch({ type: "SET_LOADING", payload: false })
-      throw error
-    }
-  }
+	const register = async (email: string, password: string, name: string) => {
+		dispatch({ type: 'SET_LOADING', payload: true });
+		try {
+			await authAPI.register(email, password, name);
+			dispatch({ type: 'SET_LOADING', payload: false });
+			// tokenStorage.setTokens(tokens)
+			// const user = await authAPI.getProfile()
+			// dispatch({ type: "SET_USER", payload: { user, tokens } })
+		} catch (error) {
+			dispatch({ type: 'SET_LOADING', payload: false });
+			throw error;
+		}
+	};
 
-  const logout = async () => {
-    try {
-      await authAPI.logout()
-    } finally {
-      tokenStorage.clearTokens()
-      dispatch({ type: "CLEAR_AUTH" })
-    }
-  }
+	const logout = async () => {
+		try {
+			await authAPI.logout();
+		} finally {
+			tokenStorage.clearTokens();
+			dispatch({ type: 'CLEAR_AUTH' });
+		}
+	};
 
-  const refreshTokens = async () => {
-    if (!state.tokens?.refreshToken) return
+	const refreshTokens = async () => {
+		if (!state.tokens?.refreshToken) return;
 
-    try {
-      const newTokens = await authAPI.refreshToken(state.tokens.refreshToken)
-      tokenStorage.setTokens(newTokens)
-      dispatch({ type: "SET_TOKENS", payload: newTokens })
-    } catch (error) {
-      await logout()
-      throw error
-    }
-  }
+		try {
+			const newTokens = await authAPI.refreshToken(state.tokens.refreshToken);
+			tokenStorage.setTokens(newTokens);
+			dispatch({ type: 'SET_TOKENS', payload: newTokens });
+		} catch (error) {
+			await logout();
+			throw error;
+		}
+	};
 
-  const value: AuthContextType = {
-    ...state,
-    login,
-    register,
-    logout,
-    refreshTokens,
-  }
+	const value: AuthContextType = {
+		...state,
+		login,
+		register,
+		logout,
+		refreshTokens,
+	};
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+	const context = useContext(AuthContext);
+	if (context === undefined) {
+		throw new Error('useAuth must be used within an AuthProvider');
+	}
+	return context;
 }
